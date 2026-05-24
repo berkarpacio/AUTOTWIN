@@ -1,0 +1,17 @@
+# VSPGEOM v3 Tag Key File
+C:/Users/Berk/OneDrive/Desktop/AutoTwin/vsp_runs/run_001/autotwin_aircraft.vspgeom
+4
+
+# part#,geom#,surf#,gname,gid,thick,plate,copy#,geomcopy#
+1,0,0,Main_Wing_S,YZGKKQVRBU,1,0,1,1
+2,0,1,Main_Wing_S,YZGKKQVRBU,1,0,2,1
+3,1,0,H_Stab_S,MLFQWNFTTQ,1,0,1,2
+4,1,1,H_Stab_S,MLFQWNFTTQ,1,0,2,2
+
+4
+
+# tag#,part#,ssname1,ssname2,...,ssid1,ssid2,...
+1,1
+2,2
+3,3
+4,4

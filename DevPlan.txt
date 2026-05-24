@@ -1,0 +1,124 @@
+STEP 1 - FREEZE THE PLATFORM KERNEL
+
+1. Lock TwinDSL schema v01.
+- system / components / ports / connections
+- parameters (typed, with units)
+- models (inputs/outputs)
+- requirements (check expressions + verification method)
+- scenarios + variants (optional)
+
+2. Lock Port kind taxonomy v0.1
+- data
+- energy.electrical, energy.chmical, energy.mechanical
+- mass.fluid
+- force
+- thermal
+- power 
+
+3. Lock compilation outputs
+- graph.json (system intermediate representation (IR))
+- plan.json (model execution directed acyclic graph (DAG))
+- tests.json (verification plan) 
+
+
+STEP 2 - BUILD LIBRARIES
+
+Use a 3-layer library system:
+- Kernel library (domain-agnostic)
+- Domain libraries (aerospace, nuclear, automotive,...)
+- Company libraries (customer-specific)
+
+For each library, create components and models. 
+Each component type defines:
+- ports (kinds + direction)
+- parameters (types + units + defaults + bounds)
+- optional capability tags (e.g., provides: thrust, consumes: electrical_power)
+
+Here are a few example kernel libraries and kernel components
+
+Energy and power
+- battery_pack, fuel_cell_stack, inverter,...
+
+Actuation/propulsion
+- electric_motor, propeller, rotor,...
+
+Structures/vehicles
+- airframe.fixed_wing, fuselage, wing,...
+
+
+
+STEP 3 - WRITE 3 REFERENCE TEMPLATES 
+
+- eVTOL lift+cruise
+- BEV powertrain
+- Hydrogen energy sysyem
+
+For each reference template, make sure you have:
+- System graph with 8–20 components (don’t overdo)
+- 2–4 models (weight, mission/drivecycle, power/energy, thermal if needed)
+- 6–12 requirements with executable checks
+- 1–2 scenarios
+- 1 variant
+
+
+STEP 4 - BUILD LLM -> DSL CONTRACT AROUND THOSE TEMPLATES
+
+Make the LLM do this deterministically:
+- choose one of the templates
+- fill missing parameters
+- add/adjust requirements
+- flag ambiguity
+If the LLM tries to invent new component types: reject and ask the user.
+
+
+STEP 5 - DEMO
+
+MVP: An intent-to-architecture compiler that turns natural-language system 
+requirements into an executable system definition, runs physics-based analyses, 
+and verifies requirements automatically. The goal is to develop a software-defined engineering
+system that meets all the requirements and ready for virtual experimentation and rapid iterative
+design improvement.
+
+Goals: 
+✅ Works end-to-end (prompt → result)
+✅ Deterministic after DSL generation
+✅ Shows requirement verification, not just simulation
+✅ Demonstrates modularity + iteration
+✅ Demonstrates human-in-the-loop checkpoints
+❌ Does not try to be a full digital twin
+❌ Does not require IoT, live data, CAD, or real-time control
+❌ Does not support many domains (1–2 max)
+
+Operation:
+
+1. Input  
+- User provides either a short natural-language prompt
+or a structured list of requirements
+- Example: Design a 4-seat lift-and-cruise eVTOL with 200 km range and 20% energy reserve.
+
+2. LLM-driven DSL generation (controlled)
+- The LLM:
+    - selects a single reference template
+    - fills parameters
+    - generates executable requirements
+    - flags ambiguity
+- LLM output = AutoTwin YAML
+
+3. Deterministic compilation pipeline
+Once the YAML exists:
+- schema validation
+- library resolution
+- system graph build
+- model execution plan
+- requirement evaluation
+
+4. Results
+- Clear PASS / FAIL per requirement
+- Key performance outputs (range, mass, energy, etc.)
+- Change → re-run → updated verdict
+
+5. Human checkpoints
+At exactly three points:
+- Intent confirmation
+- Architecture confirmation
+- Result acceptance / iteration

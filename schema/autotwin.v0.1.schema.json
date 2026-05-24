@@ -1,0 +1,274 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/twindsl/twindsl.v0.1.schema.json",
+  "title": "TwinDSL v0.1",
+  "type": "object",
+  "required": ["dsl", "system", "components", "connections", "models", "requirements"],
+  "additionalProperties": false,
+
+  "properties": {
+    "dsl": {
+      "type": "string",
+      "const": "TwinDSL/v0.1"
+    },
+
+    "system": {
+      "type": "object",
+      "required": ["id", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1 },
+        "domain": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 0
+        },
+        "description": { "type": "string" }
+      }
+    },
+
+    "provenance": { "type": "object" },
+    "units": { "type": "object" },
+    "libraries": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+
+    "parameters": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/parameter" }
+    },
+
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/component" }
+    },
+
+    "connections": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/connection" }
+    },
+
+    "models": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/model" }
+    },
+
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/requirement" }
+    },
+
+    "scenarios": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/scenario" }
+    },
+
+    "variants": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/variant" }
+    }
+  },
+
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Z][A-Z0-9_-]*$"
+    },
+
+    "refPort": {
+      "type": "string",
+      "description": "Reference to a component port in the form COMPONENT.port",
+      "pattern": "^[A-Z][A-Z0-9_-]*\\.[a-zA-Z][a-zA-Z0-9_-]*$"
+    },
+
+    "value": {
+      "description": "Primitive scalar values only in v0.1 (extend later).",
+      "oneOf": [
+        { "type": "number" },
+        { "type": "integer" },
+        { "type": "string" },
+        { "type": "boolean" }
+      ]
+    },
+
+    "parameterValueInline": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "units": { "type": "string", "minLength": 1 },
+        "value": { "$ref": "#/$defs/value" },
+        "bounds": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+
+    "parameter": {
+      "type": "object",
+      "required": ["id", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "units": { "type": "string", "minLength": 1 },
+        "value": { "$ref": "#/$defs/value" },
+        "bounds": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "description": { "type": "string" }
+      }
+    },
+
+    "port": {
+      "type": "object",
+      "required": ["id", "kind", "dir"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$"
+        },
+        "kind": { "type": "string", "minLength": 1 },
+        "dir": { "type": "string", "enum": ["in", "out", "inout"] },
+        "units": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" }
+      }
+    },
+
+    "component": {
+      "type": "object",
+      "required": ["id", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "type": "string", "minLength": 1 },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/parameterValueInline" }
+        },
+        "ports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/port" }
+        }
+      }
+    },
+
+    "connection": {
+      "type": "object",
+      "required": ["from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "from": { "$ref": "#/$defs/refPort" },
+        "to": { "$ref": "#/$defs/refPort" },
+        "mapping": { "type": "object" }
+      }
+    },
+
+    "modelIO": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "units": { "type": "string", "minLength": 1 }
+      }
+    },
+
+    "model": {
+      "type": "object",
+      "required": ["id", "type", "inputs", "outputs"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "type": "string", "minLength": 1 },
+        "entrypoint": { "type": "string", "minLength": 1 },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "string", "minLength": 1 },
+              { "$ref": "#/$defs/refPort" }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/modelIO" }
+        },
+        "resources": { "type": "object" },
+        "cache": { "type": "object" }
+      }
+    },
+
+    "verify": {
+      "type": "object",
+      "required": ["method"],
+      "additionalProperties": false,
+      "properties": {
+        "method": { "type": "string", "enum": ["analysis", "simulation", "test", "inspection"] },
+        "model": { "$ref": "#/$defs/id" },
+        "check": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "method": { "const": "inspection" } } },
+          "then": { "required": ["evidence"] }
+        }
+      ]
+    },
+
+    "requirement": {
+      "type": "object",
+      "required": ["id", "statement", "severity", "verify"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "statement": { "type": "string", "minLength": 1 },
+        "severity": { "type": "string", "enum": ["must", "should", "may"] },
+        "verify": { "$ref": "#/$defs/verify" }
+      }
+    },
+
+    "scenario": {
+      "type": "object",
+      "required": ["id", "type"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "type": "string", "minLength": 1 },
+        "parameters": { "type": "object" }
+      }
+    },
+
+    "variant": {
+      "type": "object",
+      "required": ["id", "overrides"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "overrides": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}
