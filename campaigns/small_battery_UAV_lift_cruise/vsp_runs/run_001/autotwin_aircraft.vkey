@@ -1,0 +1,21 @@
+# VSPGEOM v3 Tag Key File
+C:/Users/Berk/OneDrive/Desktop/AutoTwin/campaigns/small_battery_UAV_lift_cruise/vsp_runs/run_001/autotwin_aircraft.vspgeom
+6
+
+# part#,geom#,surf#,gname,gid,thick,plate,copy#,geomcopy#
+1,0,0,Main_Wing_C,NVWCEGZDOZ,0,3,1,1
+2,0,1,Main_Wing_C,NVWCEGZDOZ,0,3,2,1
+3,2,0,H_Stab_C,DYKUSAHXOL,0,3,1,3
+4,2,1,H_Stab_C,DYKUSAHXOL,0,3,2,3
+5,1,0,V_Stab_C,ETUDIECNYH,0,3,1,2
+6,1,1,V_Stab_C,ETUDIECNYH,0,3,2,2
+
+6
+
+# tag#,part#,ssname1,ssname2,...,ssid1,ssid2,...
+1,1
+2,2
+3,3
+4,4
+5,5
+6,6

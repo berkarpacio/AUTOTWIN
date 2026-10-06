@@ -1,0 +1,267 @@
+models:
+  - id: MOO
+    type: "python"
+    entrypoint: "small_battery_UAV_eVTOL_MOO:small_UAV_eVTOL_MOO"
+    inputs:
+      - MISSION.t_hover
+      - MISSION.t_vertical_climb
+      - MISSION.range_cruise
+      - FUSELAGE.fuselage_l
+      - FUSELAGE.fuselage_w
+      - SYSTEM.CD0
+      - SYSTEM.CL_max
+      - SYSTEM.stall_margin
+      - MAIN_WING.e_wing
+      - SYSTEM.l_max
+      - BATTERY.rho_battery
+      - BATTERY.e_usable_battery
+      - BATTERY.mass_battery
+      - HOVER_BLDC.eta_elec_hover_bldc
+      - HOVER_BLDC.rho_motor_hover_bldc
+      - HOVER_PROPELLER.num_rotors_hover_propeller
+      - HOVER_PROPELLER.eta_prop_hover_propeller
+      - HOVER_PROPELLER.mass_hover_propeller
+      - CRUISE_BLDC.eta_elec_cruise_bldc
+      - CRUISE_BLDC.rho_motor_cruise_bldc
+      - CRUISE_PROPELLER.num_rotors_cruise_propeller
+      - CRUISE_PROPELLER.eta_prop_cruise_propeller
+      - CRUISE_PROPELLER.mass_cruise_propeller
+      - MISSION.b_cruise
+      - MISSION.b_climb
+      - MISSION.h_cruise
+      - MISSION.h_climb_start
+      - MISSION.h_hover
+      - MISSION.theta_climb
+      - MISSION.g
+      - MISSION.vertical_climb_factor
+      - AUXILLIARY.mass_auxilliary
+      - FLIGHT_CONTROLLER.mass_flight_controller
+      - FLIGHT_COMPUTER.mass_flight_computer
+      - SERVO.num_servo
+      - SERVO.mass_servo
+      - STRUCTURES.mass_structures_factor
+      - SYSTEM.MTOM_bounds
+      - SYSTEM.V_cruise_bounds
+      - SYSTEM.V_climb_bounds
+      - MAIN_WING.S_wing_bounds
+      - MAIN_WING.AR_wing_bounds
+      - CRUISE_PROPELLER.radius_cruise_propeller_bounds
+      - HOVER_PROPELLER.radius_hover_propeller_bounds
+      - MAIN_WING.b_wing_bounds
+      - CRUISE_ESC.mass_cruise_esc
+      - HOVER_ESC.mass_hover_esc
+      - PDB.mass_pdb
+      - POWER_MODULE.mass_power_module
+      - RECEIVER.mass_rc_receiver
+      - AIRSPEED_SENSOR.mass_airspeed_sensor
+      - PAYLOAD.mass_payload
+      - LTE_MODEM.mass_lte_modem
+      - GPS.mass_gps
+      - SYSTEM.tol_mass_kg
+      - OPTIMIZATION.pop_size
+      - OPTIMIZATION.n_gen
+      - OPTIMIZATION.seed
+      - OPTIMIZATION.verbose
+      - OPTIMIZATION.plot_pareto
+      - OPTIMIZATION.pareto_plot_path
+      - OPTIMIZATION.pareto_plot_block
+    outputs:
+      - name: SYSTEM.MTOM
+        units: kg
+      - name: MAIN_WING.S_wing
+        units: m^2
+      - name: MAIN_WING.AR_wing
+      - name: SYSTEM.wing_loading
+        units: N/m^2
+      - name: MAIN_WING.b_wing
+        units: m
+      - name: SYSTEM.V_cruise
+        units: m/s
+      - name: SYSTEM.V_climb
+        units: m/s
+      - name: SYSTEM.V_stall
+        units: m/s
+      - name: SYSTEM.LD_cruise
+      - name: CRUISE_PROPELLER.radius_cruise_propeller
+        units: m
+      - name: HOVER_PROPELLER.radius_hover_propeller
+        units: m
+      - name: MISSION.t_trip
+        units: minutes
+      - name: MISSION.t_cruise
+        units: minutes
+      - name: MISSION.t_climb
+        units: minutes
+      - name: MISSION.e_trip
+        units: Wh
+      - name: SYSTEM.energy_stored_onboard
+        units: Wh
+      - name: BATTERY.energy_battery
+        units: Wh
+      - name: BATTERY.energy_battery_stored
+        units: Wh
+      - name: BATTERY.mass_battery
+        units: kg
+      - name: SYSTEM.CL_cruise
+      - name: SYSTEM.CD_cruise
+      - name: SYSTEM.P_vertical_climb
+        units: W
+      - name: SYSTEM.P_hover
+        units: W
+      - name: SYSTEM.P_cruise
+        units: W
+      - name: SYSTEM.P_climb
+        units: W
+      - name: HOVER_BLDC.P_motor_hover_bldc
+        units: W
+      - name: CRUISE_BLDC.P_motor_cruise_bldc
+        units: W
+      - name: HOVER_BLDC.mass_hover_bldc_per_rotor
+        units: kg
+      - name: CRUISE_BLDC.mass_cruise_bldc_per_rotor
+        units: kg
+      - name: STRUCTURES.mass_structures
+        units: kg
+      - name: SERVO.mass_servos
+        units: kg
+      - name: FLIGHT_CONTROLLER.mass_flight_controller
+        units: kg
+      - name: FLIGHT_COMPUTER.mass_flight_computer
+        units: kg
+      - name: AUXILLIARY.mass_auxilliary
+        units: kg
+      - name: SYSTEM.max_length
+        units: m
+      - name: SYSTEM.disk_loading
+        units: N/m^2
+      - name: OPTIMIZATION.status
+      - name: OPTIMIZATION.best_idx
+      - name: OPTIMIZATION.best_objectives
+      - name: OPTIMIZATION.max_constraint_violation
+      - name: OPTIMIZATION.pareto_set_size
+      - name: OPTIMIZATION.pareto_X
+      - name: OPTIMIZATION.pareto_F
+      - name: OPTIMIZATION.pareto_plot_path
+
+  - id: OpenVSP_CONFIG
+    type: "python"
+    entrypoint: "configurator_boom_mounted_Atail:configurator"
+    inputs:
+      - MAIN_WING.S_wing
+      - MAIN_WING.AR_wing
+      - FUSELAGE.fuselage_l
+      - FUSELAGE.fuselage_w
+      - HOVER_PROPELLER.radius_hover_propeller
+      - CRUISE_PROPELLER.radius_cruise_propeller
+      - CRUISE_PROPELLER.cruise_propeller_num_blades
+      - CRUISE_PROPELLER.cruise_propeller_x_rot
+      - CRUISE_PROPELLER.cruise_propeller_y_rot
+      - CRUISE_PROPELLER.cruise_propeller_offset
+      - CRUISE_PROPELLER.cruise_propeller_z_rot
+      - MAIN_WING.taper_ratio_wing
+      - MAIN_WING.theta_wing
+      - MAIN_WING.t_over_c_wing
+      - MAIN_WING.x_loc_wing
+      - MAIN_WING.y_loc_wing
+      - MAIN_WING.z_loc_wing
+      - MAIN_WING.x_rot_wing
+      - MAIN_WING.y_rot_wing
+      - MAIN_WING.z_rot_wing
+      - MAIN_WING.root_ThickChord_wing
+      - MAIN_WING.root_Camber_wing
+      - MAIN_WING.root_CamberLoc_wing
+      - MAIN_WING.tip_ThickChord_wing
+      - MAIN_WING.tip_Camber_wing
+      - MAIN_WING.tip_CamberLoc_wing
+      - MAIN_WING.aileron_hinge
+      - MAIN_WING.aileron_start
+      - MAIN_WING.aileron_end
+      - TAIL.c_HT
+      - TAIL.AR_hstab
+      - TAIL.AR_vstab
+      - TAIL.taper_ratio_hstab
+      - TAIL.taper_ratio_vstab
+      - TAIL.theta_hstab
+      - TAIL.theta_vstab
+      - TAIL.c_VT
+      - TAIL.z_loc_vstab
+      - TAIL.x_rot_hstab
+      - TAIL.x_rot_vstab
+      - TAIL.y_rot_hstab
+      - TAIL.y_rot_vstab
+      - TAIL.z_rot_hstab
+      - TAIL.z_rot_vstab
+      - TAIL.root_ThickChord_hstab
+      - TAIL.root_ThickChord_vstab
+      - TAIL.root_Camber_hstab
+      - TAIL.root_Camber_vstab
+      - TAIL.root_CamberLoc_hstab
+      - TAIL.root_CamberLoc_vstab
+      - TAIL.tip_ThickChord_hstab
+      - TAIL.tip_ThickChord_vstab
+      - TAIL.tip_Camber_hstab
+      - TAIL.tip_Camber_vstab
+      - TAIL.tip_CamberLoc_hstab
+      - TAIL.tip_CamberLoc_vstab
+      - TAIL.ctrl_hinge_hstab
+      - TAIL.ctrl_hinge_vstab
+      - TAIL.ctrl_start_hstab
+      - TAIL.ctrl_start_vstab
+      - TAIL.ctrl_end_hstab
+      - TAIL.ctrl_end_vstab
+      - TAIL.tail_rotor_clearance
+      - FUSELAGE.motor_mount_extension
+      - FUSELAGE.hover_rotor_clearance
+      - FUSELAGE.fuselage_y_loc
+      - FRONT_RIGHT_PROPELLER.fr_propeller_num_blades
+      - FRONT_RIGHT_PROPELLER.fr_propeller_z_loc
+      - FRONT_RIGHT_PROPELLER.fr_propeller_x_rot
+      - FRONT_RIGHT_PROPELLER.fr_propeller_y_rot
+      - FRONT_RIGHT_PROPELLER.fr_propeller_z_rot
+      - FRONT_LEFT_PROPELLER.fl_propeller_num_blades
+      - FRONT_LEFT_PROPELLER.fl_propeller_z_loc
+      - FRONT_LEFT_PROPELLER.fl_propeller_x_rot
+      - FRONT_LEFT_PROPELLER.fl_propeller_y_rot
+      - FRONT_LEFT_PROPELLER.fl_propeller_z_rot
+      - BACK_RIGHT_PROPELLER.br_propeller_num_blades
+      - BACK_RIGHT_PROPELLER.br_propeller_z_loc
+      - BACK_RIGHT_PROPELLER.br_propeller_x_rot
+      - BACK_RIGHT_PROPELLER.br_propeller_y_rot
+      - BACK_RIGHT_PROPELLER.br_propeller_z_rot
+      - BACK_LEFT_PROPELLER.bl_propeller_num_blades
+      - BACK_LEFT_PROPELLER.bl_propeller_z_loc
+      - BACK_LEFT_PROPELLER.bl_propeller_x_rot
+      - BACK_LEFT_PROPELLER.bl_propeller_y_rot
+      - BACK_LEFT_PROPELLER.bl_propeller_z_rot
+    outputs:
+      - name: CONFIGURATION.cg_xyz
+      - name: CONFIGURATION.wings
+      - name: CONFIGURATION.fuselages
+      - name: CONFIGURATION.props
+      - name: TAIL.S_hstab
+      - name: TAIL.S_vstab
+      - name: TAIL.x_loc_vstab
+      - name: TAIL.x_loc_hstab
+      - name: TAIL.y_loc_vstab
+      - name: TAIL.z_loc_hstab
+      - name: TAIL.b_hstab
+      - name: TAIL.b_vstab
+
+
+  - id: OpenVSP
+    type: "python"
+    entrypoint: "libraries.aerospace.aerodynamics.vsp_run:vsp_run"
+    inputs:
+      - CONFIGURATION.cg_xyz
+      - CONFIGURATION.wings
+      - CONFIGURATION.fuselages
+      - CONFIGURATION.props
+      - OPENVSP.alpha_list_deg
+    outputs:
+      - name: OPENVSP.vsp3_path
+      - name: OPENVSP.geom_ids
+      - name: OPENVSP.reference
+      - name: OPENVSP.analysis
+      - name: OPENVSP.sweep_outputs
+      - name: OPENVSP.notes
+      - name: OPENVSP.debug

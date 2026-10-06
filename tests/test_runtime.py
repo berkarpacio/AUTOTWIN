@@ -1,6 +1,6 @@
 from examples.small_UAV_lift_cruise.design_campaign import generate_design_campaign
-from libraries.aerospace.models.optimization.small_GH2_UAV_eVTOL_MOO import small_UAV_eVTOL_MOO
-from libraries.aerospace.models.geometry.airframe_fw import create_aircraft_geometry
+from libraries.aerospace.optimization.small_GH2_UAV_eVTOL_MOO import small_UAV_eVTOL_MOO
+from libraries.aerospace.geometry.airframe_fw import create_aircraft_geometry
 from pathlib import Path
 import math
 

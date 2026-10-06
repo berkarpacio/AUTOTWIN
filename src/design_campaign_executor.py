@@ -120,8 +120,8 @@ class ParameterStore:
 
 def load_callable(entrypoint: str):
     """
-    entrypoint: "libraries.aerospace.models.optimization.small_UAV_eVTOL_MOO:small_UAV_eVTOL_MOO"
-    or          "models.optimization:small_UAV_eVTOL_MOO" (if your module path is set)
+    entrypoint: "libraries.aerospace.optimization.small_UAV_eVTOL_MOO:small_UAV_eVTOL_MOO"
+    or          "optimization:small_UAV_eVTOL_MOO" (if your module path is set)
     """
     if ":" not in entrypoint:
         raise ValueError(f"Invalid entrypoint '{entrypoint}'. Use 'module.submodule:function_name'.")
