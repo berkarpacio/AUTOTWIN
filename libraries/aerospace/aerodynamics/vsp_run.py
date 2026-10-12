@@ -613,7 +613,7 @@ def vsp_run(
     out_dir = input_dict.get("out_dir", out_dir)
     vsp3_name = input_dict.get("vsp3_name", vsp3_name)
 
-    openvsp_root = Path(r"C:\Users\Berk\OneDrive\Desktop\OpenVSP-3.47.0-win64")
+    openvsp_root = Path(r"C:\Users\Berk\OneDrive\Desktop\OpenVSP-3.51.3-win64")
     paths = configure_openvsp_python(openvsp_root)
 
     import importlib
