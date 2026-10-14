@@ -1,0 +1,28 @@
+{
+  "wings": [
+    {
+      "name": "Optimized wing",
+      "S": 0.25,
+      "AR": 16.0,
+      "taper": 0.3086229424330432,
+      "sweep_deg": -3.176546027725058,
+      "root_ThickChord": 0.1,
+      "tip_ThickChord": 0.1,
+      "root_Camber": 0.0,
+      "tip_Camber": 0.0,
+      "root_CamberLoc": 0.4,
+      "tip_CamberLoc": 0.4
+    }
+  ],
+  "fuselages": [],
+  "props": [],
+  "cg_xyz": [
+    0.03125,
+    0,
+    0
+  ],
+  "alpha_list_deg": [
+    10.005227491550693
+  ],
+  "openvsp_root": "C:\\Users\\Berk\\OneDrive\\Desktop\\OpenVSP-3.51.3-win64"
+}

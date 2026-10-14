@@ -1,0 +1,17 @@
+{
+  "design": {
+    "taper": 0.5,
+    "sweep_deg": 14.652742683453672,
+    "alpha_deg": 10.005950508225213
+  },
+  "directory": "C:\\Users\\Berk\\OneDrive\\Desktop\\AutoTwin\\vsp_runs\\shape_optimization\\20261014_231350_erh67z_9\\eval_00045",
+  "status": "ok",
+  "objective": 0.032614941245,
+  "constraint": 0.055422833559000025,
+  "CL": 0.934577166441,
+  "CD": 0.032614941245,
+  "L_over_D": 28.65487812535227,
+  "feasible": false,
+  "vsp3_path": "C:\\Users\\Berk\\OneDrive\\Desktop\\AutoTwin\\vsp_runs\\shape_optimization\\20261014_231350_erh67z_9\\eval_00045\\autotwin_aircraft.vsp3",
+  "notes": []
+}
