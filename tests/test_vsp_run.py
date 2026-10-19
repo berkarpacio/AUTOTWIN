@@ -1,25 +1,12 @@
-"""Readable, standalone version of the OpenVSP runner (not a pytest test).
-
-Call ``vsp_run(input_dict)`` with ``wings`` and ``cg_xyz``; ``fuselages`` and
-``props`` are optional. Geometry dictionaries use the production runner's keys.
-Edit DEFAULT_OPENVSP_ROOT below to change the default installation directory.
-``input_dict['openvsp_root']`` or OPENVSP_ROOT can override that default.
-
-The saved model contains every component. The aerodynamic sweep includes wings
-and tails only, at one Mach number and evenly spaced angles of attack.
-Importing this file does not load OpenVSP or run an analysis.
-"""
+"""Aircraft-object VSPAERO runner; importing this module does not run OpenVSP."""
 
 from __future__ import annotations
 
-import ast
 import importlib
 import math
 import os
 from pathlib import Path
-import re
 import sys
-from typing import Any
 
 
 # Edit this path when moving or upgrading your OpenVSP installation.
@@ -71,216 +58,7 @@ def _load_openvsp(root=None):
     return vsp
 
 
-def _read_alphas(value):
-    """Accept the numeric/list/string formats used by campaign inputs."""
-    if value is None:
-        value = [0.0, 1.0, 2.0]
-    if isinstance(value, str):
-        try:
-            value = ast.literal_eval(value)
-        except (ValueError, SyntaxError):
-            value = [part.strip() for part in value.split(",") if part.strip()]
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        value = [value]
-    if not isinstance(value, (list, tuple)) or not value:
-        raise ValueError("alpha_list_deg must contain one or more numbers")
-    alphas = [float(alpha) for alpha in value]
-    if not all(math.isfinite(alpha) for alpha in alphas):
-        raise ValueError("alpha_list_deg must contain finite numbers")
-
-    # VSPAERO takes start/end/count, not an arbitrary list of angles.
-    ordered = sorted(alphas)
-    if len(ordered) > 1:
-        step = (ordered[-1] - ordered[0]) / (len(ordered) - 1)
-        if step == 0 or any(
-            not math.isclose(alpha, ordered[0] + i * step, abs_tol=1e-8)
-            for i, alpha in enumerate(ordered)
-        ):
-            raise ValueError("alpha_list_deg must be distinct and evenly spaced")
-    return alphas
-
-
-def _set_parameter(vsp, targets, names, groups, value, notes):
-    """Find a real parameter before setting it; some VSP failures do not raise."""
-    for target in targets:
-        for name in names:
-            for group in groups:
-                parameter = vsp.FindParm(target, name, group)
-                if parameter:
-                    vsp.SetParmVal(parameter, float(value))
-                    return
-    notes.append(f"WARNING: Could not find {names[0]} on {targets[0]}.")
-
-
-def _set_transform(vsp, geom_id, spec, *, fuselage=False):
-    """Apply position and rotation, including the fuselage-specific input keys."""
-    for axis in "XYZ":
-        for suffix, input_suffix, legacy_suffix in (
-            ("Location", "", "Loc"), ("Rotation", "_rot", "Rot")
-        ):
-            value = spec.get(axis.lower() + input_suffix, 0.0)
-            if fuselage:
-                value = spec.get(f"fuselage_{axis}{legacy_suffix}", value)
-            vsp.SetParmVal(geom_id, f"{axis}_Rel_{suffix}", "XForm", float(value))
-
-
-def _resize_fuselage(vsp, geom_id, count):
-    """Adjust section count, failing if OpenVSP makes no progress."""
-    if count < 2:
-        raise ValueError("A fuselage needs at least two cross sections")
-    surface = vsp.GetXSecSurf(geom_id, 0)
-    while vsp.GetNumXSec(surface) != count:
-        before = vsp.GetNumXSec(surface)
-        if before < count:
-            for index in dict.fromkeys([before - 1, *range(before)]):
-                vsp.InsertXSec(geom_id, index, vsp.XS_ELLIPSE)
-                vsp.Update()
-                surface = vsp.GetXSecSurf(geom_id, 0)
-                if vsp.GetNumXSec(surface) > before:
-                    break
-        else:
-            vsp.CutXSec(geom_id, before - 1)
-            vsp.Update()
-            surface = vsp.GetXSecSurf(geom_id, 0)
-        if abs(vsp.GetNumXSec(surface) - count) >= abs(before - count):
-            raise RuntimeError(f"Could not resize fuselage from {before} to {count} sections")
-    return surface
-
-
-def _add_fuselage(vsp, spec, notes):
-    """Build a rectangular fuselage or circular boom from its section inputs."""
-    geom_id = vsp.AddGeom("FUSELAGE", "")
-    vsp.SetGeomName(geom_id, str(spec.get("name", "Fuselage")))
-    vsp.SetParmVal(geom_id, "Length", "Design", float(spec["length"]))
-    indices = [
-        int(match.group(1)) for key in spec
-        if (match := re.fullmatch(r"XSec_(\d+)_(?:XLoc|ZLoc|w|h|diameter|Diameter)", str(key)))
-    ]
-    count = int(spec.get("xsec_count", max(indices, default=1) + 1))
-    surface = _resize_fuselage(vsp, geom_id, count)
-    circular = str(spec.get("shape", "rectangle")).lower() in {"circle", "circular"}
-
-    for i in range(count):
-        vsp.ChangeXSecShape(surface, i, vsp.XS_CIRCLE if circular else vsp.XS_EDIT_CURVE)
-        if not circular:
-            section = vsp.GetXSec(surface, i)
-            parameter = vsp.GetXSecParm(section, "ShapeType")
-            if not parameter:
-                raise RuntimeError(f"Missing ShapeType for fuselage section {i}")
-            vsp.SetParmVal(parameter, vsp.EDIT_XSEC_RECTANGLE)
-            vsp.EditXSecInitShape(section)
-    vsp.Update()
-
-    for i in range(count):
-        section = vsp.GetXSec(surface, i)
-        prefix = f"XSec_{i}_"
-        width, height = spec.get(prefix + "w"), spec.get(prefix + "h")
-        if circular:
-            diameter = spec.get(prefix + "diameter", spec.get(prefix + "Diameter"))
-            if diameter is None and width is not None and height is not None:
-                diameter = (float(width) + float(height)) / 2
-            if diameter is None:
-                raise ValueError(f"Missing diameter for fuselage section {i}")
-            parameter = vsp.GetXSecParm(section, "Circle_Diameter")
-            if not parameter:
-                raise RuntimeError(f"Missing Circle_Diameter for fuselage section {i}")
-            vsp.SetParmVal(parameter, float(diameter))
-        else:
-            if width is None or height is None:
-                raise ValueError(f"Missing width/height for fuselage section {i}")
-            vsp.SetXSecWidthHeight(section, float(width), float(height))
-
-        section_values = {
-            "XLocPercent": spec.get(prefix + "XLoc"),
-            "ZLocPercent": spec.get(prefix + "ZLoc"),
-        }
-        for name in ("RightLAngle", "TopLAngle", "RightLStrength", "TopLStrength"):
-            section_values[name] = spec.get(prefix + name, spec.get(name))
-        for name, value in section_values.items():
-            if value is None:
-                continue
-            parameter = vsp.GetXSecParm(section, name)
-            if parameter:
-                vsp.SetParmVal(parameter, float(value))
-            else:
-                _set_parameter(vsp, [geom_id], [name], [f"XSec_{i}"], value, notes)
-    _set_transform(vsp, geom_id, spec, fuselage=True)
-    vsp.Update()
-    return geom_id
-
-
-def _add_control_surface(vsp, wing_id, spec, notes):
-    values = [spec.get(key) for key in ("ctrl_start", "ctrl_end", "ctrl_hinge")]
-    if all(value is None for value in values):
-        return
-    if any(value is None for value in values):
-        raise ValueError("Control surfaces require ctrl_start, ctrl_end, and ctrl_hinge")
-    start, end, hinge = map(float, values)
-    hinge_end = float(spec.get("ctrl_hinge_end", hinge))
-    if not (0 <= start < end <= 1 and 0 <= hinge <= 1 and 0 <= hinge_end <= 1):
-        raise ValueError("Invalid control surface extent or chord fraction")
-    control_id = vsp.AddSubSurf(wing_id, vsp.SS_CONTROL)
-    groups = [f"SS_Control_{vsp.GetNumSubSurf(wing_id)}", "SS_Control_1", "SS_Control"]
-    parameters = {
-        "EtaFlag": 1, "EtaStart": start, "EtaEnd": end,
-        "Length_C_Start": hinge, "Length_C_End": hinge_end,
-        "LE_Flag": spec.get("ctrl_le_flag", 0),
-    }
-    for name, value in parameters.items():
-        names = [name, "LEFlag"] if name == "LE_Flag" else [name]
-        _set_parameter(vsp, [wing_id, control_id], names, groups, value, notes)
-
-
-def _add_wing(vsp, spec, notes):
-    """Convert area/aspect ratio/taper into a single trapezoidal wing."""
-    area, aspect_ratio = float(spec["S"]), float(spec["AR"])
-    taper = float(spec.get("taper", 1.0))
-    if not (area > 0 and aspect_ratio > 0 and taper >= 0):
-        raise ValueError("Wing S and AR must be positive; taper must be nonnegative")
-    span = math.sqrt(area * aspect_ratio)
-    root_chord = 2 * area / (span * (1 + taper))
-    geom_id = vsp.AddGeom("WING", "")
-    vsp.SetGeomName(geom_id, str(spec.get("name", "Wing")))
-    vsp.SetDriverGroup(geom_id, 1, vsp.SPAN_WSECT_DRIVER, vsp.ROOTC_WSECT_DRIVER, vsp.TIPC_WSECT_DRIVER)
-    vsp.SetParmVal(geom_id, "TotalSpan", "WingGeom", span)
-    for name, value in {
-        "Root_Chord": root_chord, "Tip_Chord": root_chord * taper,
-        "Sweep": spec.get("sweep_deg", 0.0), "Sweep_Location": 0.0,
-    }.items():
-        vsp.SetParmVal(geom_id, name, "XSec_1", float(value))
-    _set_transform(vsp, geom_id, spec)
-    _add_control_surface(vsp, geom_id, spec, notes)
-    for index, end in enumerate(("root", "tip")):
-        for name, default in {"ThickChord": 0.10, "Camber": 0.04, "CamberLoc": 0.4}.items():
-            vsp.SetParmVal(geom_id, name, f"XSecCurve_{index}", float(spec.get(f"{end}_{name}", default)))
-    return geom_id, area, span
-
-
-def _add_propeller(vsp, spec, notes):
-    geom_id = vsp.AddGeom("PROP", "")
-    vsp.SetGeomName(geom_id, str(spec.get("name", "Propeller")))
-    diameter = spec.get("diameter")
-    if diameter is None and spec.get("radius") is not None:
-        diameter = 2 * float(spec["radius"])
-    if diameter is None:
-        raise ValueError("Propellers require diameter or radius")
-    _set_parameter(vsp, [geom_id], ["Diameter"], ["Design"], diameter, notes)
-    for name, keys in {
-        "NumBlade": ("num_blades", "NumBlade", "num_blade"),
-        "Beta34": ("beta34", "Beta34"), "Chord": ("chord", "Chord"),
-        "Twist": ("twist", "Twist"), "Pitch": ("pitch", "Pitch"),
-        "Rotate": ("rotate", "Rotate"), "ReverseFlag": ("reverse", "ReverseFlag"),
-        "PropMode": ("prop_mode", "PropMode"),
-    }.items():
-        value = next((spec[key] for key in keys if spec.get(key) is not None), None)
-        if value is not None:
-            _set_parameter(vsp, [geom_id], [name], ["Design"], value, notes)
-    _set_transform(vsp, geom_id, spec)
-    vsp.Update()
-    return geom_id
-
-
-def _run_sweep(vsp, wing_id, alphas, mach, reynolds, reference):
+def _run_sweep(vsp, wing_id, alphas, mach, reynolds, reference, velocity, density):
     """Compute the wing mesh, then solve at one Mach and multiple alphas."""
     geometry, sweep = "VSPAEROComputeGeometry", "VSPAEROSweep"
     missing = {geometry, sweep} - set(vsp.ListAnalysis())
@@ -300,10 +78,13 @@ def _run_sweep(vsp, wing_id, alphas, mach, reynolds, reference):
     vsp.ExecAnalysis(geometry)
 
     set_defaults(sweep)
+    vsp.SetIntAnalysisInput(sweep, "RefFlag", [vsp.MANUAL_REF], 0)
+    vsp.SetIntAnalysisInput(sweep, "NCPU", [2], 0)
     vsp.SetStringAnalysisInput(sweep, "WingID", [wing_id], 0)
     xcg, ycg, zcg = reference["cg"]
     for name, value in {
         "Sref": reference["Sref"], "bref": reference["Bref"], "cref": reference["Cref"],
+        "Vinf": velocity, "Rho": density,
         "Xcg": xcg, "Ycg": ycg, "Zcg": zcg, "ReCref": reynolds,
         "MachStart": mach, "MachEnd": mach,
         "AlphaStart": min(alphas), "AlphaEnd": max(alphas),
@@ -355,70 +136,141 @@ def _read_results(vsp, result_id, alphas, notes):
     return output
 
 
-def vsp_run(
-    input_dict: dict[str, Any],
-    out_dir: str | Path = "vsp_runs/run_001",
-    vsp3_name: str = "autotwin_aircraft.vsp3",
-    mach: float = 0.076,
-    reynolds_cref: float = 4.4e5,
-) -> dict[str, Any]:
-    """Build model -> select wings -> save model -> run sweep -> read results.
+def _checked_set(vsp, geom_id, name, group, value):
+    parameter = vsp.FindParm(geom_id, name, group)
+    if not parameter:
+        raise RuntimeError(f"Missing OpenVSP parameter {group}.{name}")
+    vsp.SetParmVal(parameter, float(value))
 
-    The reference convention is retained from the original: sum of all wing
-    areas, largest wing span, and Cref = Sref / Bref. Mach and Reynolds remain
-    function arguments. The dictionary can override out_dir and vsp3_name.
-    """
-    notes = []
-    wing_specs = input_dict["wings"]
-    if not wing_specs:
-        raise ValueError("At least one wing is required")
-    cg = tuple(float(value) for value in input_dict["cg_xyz"])
-    if len(cg) != 3 or not all(math.isfinite(value) for value in cg):
-        raise ValueError("cg_xyz must contain three finite coordinates")
-    alphas = _read_alphas(input_dict.get("alpha_list_deg"))
-    if input_dict.get("alpha_list_deg") is None:
-        notes.append("INFO: Using default alpha_list_deg = [0.0, 1.0, 2.0].")
-    openvsp_root = (
-        input_dict.get("openvsp_root")
-        or os.environ.get("OPENVSP_ROOT")
-        or DEFAULT_OPENVSP_ROOT
-    )
-    vsp = _load_openvsp(openvsp_root)
 
-    # 1. Build all components in a fresh model.
-    print("OpenVSP: building geometry...", flush=True)
-    vsp.ClearVSPModel()
-    fuselages = [_add_fuselage(vsp, spec, notes) for spec in input_dict.get("fuselages", [])]
-    wing_data = [_add_wing(vsp, spec, notes) for spec in wing_specs]
-    wings = [geom_id for geom_id, _, _ in wing_data]
-    props = [_add_propeller(vsp, spec, notes) for spec in input_dict.get("props", [])]
-    area = sum(area for _, area, _ in wing_data)
-    span = max(span for _, _, span in wing_data)
-    reference = {"Sref": area, "Bref": span, "Cref": area / span, "cg": cg}
-
-    # 2. Keep fuselages/props in the model, but exclude them from aerodynamics.
-    for geom_id in [*wings, *fuselages, *props]:
-        shown = geom_id in wings
-        vsp.SetSetFlag(geom_id, vsp.SET_SHOWN, shown)
-        vsp.SetSetFlag(geom_id, vsp.SET_NOT_SHOWN, not shown)
-    if fuselages or props:
-        notes.append("INFO: Sweep uses wings only; fuselages and props are hidden.")
+def _add_aircraft_wing(vsp, wing):
+    """Build mirrored semispan sections; twists are absolute at outboard stations."""
+    sections = wing.wing_sections
+    if not sections or len(wing.airfoils) != len(sections) + 1:
+        raise ValueError("Each wing needs sections and one airfoil per station")
+    for i, section in enumerate(sections):
+        values = vars(section)
+        if not all(math.isfinite(float(value)) for value in values.values()):
+            raise ValueError("Wing section values must be finite")
+        if min(section.span, section.root_chord, section.tip_chord) <= 0:
+            raise ValueError("Section spans and chords must be positive")
+        if not 0 <= section.twist_loc <= 1:
+            raise ValueError("twist_loc must be a chord fraction in [0, 1]")
+        if i and not math.isclose(sections[i-1].tip_chord, section.root_chord,
+                                  rel_tol=1e-9, abs_tol=1e-9):
+            raise ValueError("Adjacent sections must share a chord at their common station")
+    geom_id = vsp.AddGeom("WING", "")
+    vsp.SetGeomName(geom_id, wing.name)
+    for i in range(1, len(sections)):
+        vsp.InsertXSec(geom_id, i, vsp.XS_FOUR_SERIES)
+    _checked_set(vsp, geom_id, "Sym_Planar_Flag", "Sym", vsp.SYM_XZ)
+    _checked_set(vsp, geom_id, "RelativeTwistFlag", "WingGeom", 0)
+    _checked_set(vsp, geom_id, "Twist", "XSec_0", 0)
+    _checked_set(vsp, geom_id, "Twist_Location", "XSec_0", sections[0].twist_loc)
+    for i, section in enumerate(sections, 1):
+        vsp.SetDriverGroup(geom_id, i, vsp.SPAN_WSECT_DRIVER,
+                           vsp.ROOTC_WSECT_DRIVER, vsp.TIPC_WSECT_DRIVER)
+        for name, value in {
+            "Span": section.span, "Root_Chord": section.root_chord,
+            "Tip_Chord": section.tip_chord, "Twist": section.twist_deg,
+            "Twist_Location": section.twist_loc, "Sweep": section.sweep_deg,
+            "Sweep_Location": 0, "Dihedral": section.dihedral_deg,
+        }.items():
+            _checked_set(vsp, geom_id, name, f"XSec_{i}", value)
+        vsp.Update()
+    for i, foil in enumerate(wing.airfoils):
+        if not (0 < foil.thick_chord < 1 and 0 <= foil.camber < 1
+                and 0 < foil.camber_loc < 1):
+            raise ValueError("Invalid four-series airfoil parameters")
+        for name, value in {"ThickChord": foil.thick_chord, "Camber": foil.camber,
+                            "CamberLoc": foil.camber_loc}.items():
+            _checked_set(vsp, geom_id, name, f"XSecCurve_{i}", value)
+    for axis in "XYZ":
+        for suffix, attribute in [("Location", "loc"), ("Rotation", "rot")]:
+            value = float(getattr(wing, f"{axis.lower()}_{attribute}"))
+            if not math.isfinite(value):
+                raise ValueError("Wing transforms must be finite")
+            _checked_set(vsp, geom_id, f"{axis}_Rel_{suffix}", "XForm", value)
     vsp.Update()
+    # Read back every section: OpenVSP may silently clamp or couple parameters.
+    for i, section in enumerate(sections, 1):
+        for name, expected in {"Span": section.span, "Root_Chord": section.root_chord,
+                               "Tip_Chord": section.tip_chord, "Twist": section.twist_deg}.items():
+            actual = vsp.GetParmVal(geom_id, name, f"XSec_{i}")
+            if not math.isclose(actual, expected, rel_tol=1e-7, abs_tol=1e-8):
+                raise RuntimeError(f"Section {i} {name}: requested {expected}, got {actual}")
+    area = sum(s.span * (s.root_chord + s.tip_chord) for s in sections)
+    span = 2 * sum(s.span for s in sections)
+    for name, expected in [("TotalArea", area), ("TotalSpan", span)]:
+        actual = vsp.GetParmVal(geom_id, name, "WingGeom")
+        if not math.isclose(actual, expected, rel_tol=1e-7, abs_tol=1e-8):
+            raise RuntimeError(f"{name}: requested {expected}, got {actual}")
+    return geom_id, area, span
 
-    # 3. Save every component before running the two analysis stages.
-    folder = Path(input_dict.get("out_dir", out_dir)).expanduser().resolve()
-    folder.mkdir(parents=True, exist_ok=True)
-    model_path = folder / input_dict.get("vsp3_name", vsp3_name)
+
+def vsp_run(aircraft, V, alpha, *, h=0.0, out_dir=None,
+            vsp3_name="autotwin_aircraft.vsp3", openvsp_root=None):
+    """Evaluate an Aircraft at V [m/s], alpha [deg], and optional h [m].
+
+    Each WingXsec describes a semispan segment mirrored about the XZ plane.
+    Its twist is the absolute outboard-station twist; root twist is zero.
+    Mach and Reynolds number use the standard atmosphere at h and Cref=Sref/Bref.
+    References are the summed wing area and largest full span. Calls are serial:
+    OpenVSP owns global model state. Each call gets a unique directory by default.
+    """
+    from ambiance import Atmosphere
+    import tempfile
+
+    V, alpha, h = float(V), float(alpha), float(h)
+    if not all(math.isfinite(x) for x in (V, alpha, h)) or V <= 0:
+        raise ValueError("V must be positive; V, alpha and h must be finite")
+    if not aircraft.wing_list:
+        raise ValueError("Aircraft must contain at least one wing")
+    atmosphere = Atmosphere(h)
+    mach = V / float(atmosphere.speed_of_sound[0])
+    density = float(atmosphere.density[0])
+    vsp = _load_openvsp(openvsp_root or os.environ.get("OPENVSP_ROOT") or DEFAULT_OPENVSP_ROOT)
+    vsp.ClearVSPModel()
+    vsp.DeleteAllResults()
+    wing_data = [_add_aircraft_wing(vsp, wing) for wing in aircraft.wing_list]
+    wings = [item[0] for item in wing_data]
+    area = sum(item[1] for item in wing_data)
+    span = max(item[2] for item in wing_data)
+    reference = {"Sref": area, "Bref": span, "Cref": area / span, "cg": (0, 0, 0),
+                 "S_ref": area, "b_ref": span}
+    reynolds = V * reference["Cref"] / float(atmosphere.kinematic_viscosity[0])
+    for wing_id in wings:
+        vsp.SetSetFlag(wing_id, vsp.SET_SHOWN, True)
+        vsp.SetSetFlag(wing_id, vsp.SET_NOT_SHOWN, False)
+    if out_dir is None:
+        parent = Path("vsp_runs/optimization_evaluations").resolve()
+        parent.mkdir(parents=True, exist_ok=True)
+        folder = Path(tempfile.mkdtemp(prefix="eval_", dir=parent))
+    else:
+        folder = Path(out_dir).expanduser().resolve()
+        folder.mkdir(parents=True, exist_ok=True)
+    if Path(vsp3_name).name != vsp3_name:
+        raise ValueError("vsp3_name must be a filename")
+    model_path = folder / vsp3_name
     vsp.WriteVSPFile(str(model_path), vsp.SET_ALL)
-    result_id = _run_sweep(vsp, wings[0], alphas, mach, reynolds_cref, reference)
-
-    # 4. Return the campaign-facing outputs, including useful warnings.
+    result_id = _run_sweep(vsp, wings[0], [alpha], mach, reynolds, reference, V, density)
+    notes = []
+    sweep_outputs = _read_results(vsp, result_id, [alpha], notes)
+    for name in ("CL", "CD"):
+        values = sweep_outputs[name]
+        if len(values) != 1 or not math.isfinite(values[0]):
+            raise RuntimeError(f"VSPAERO returned no finite {name}: {notes}")
+    if sweep_outputs["CD"][0] < 0:
+        raise RuntimeError("VSPAERO returned negative CD")
     return {
-        "vsp3_path": str(model_path),
-        "geom_ids": {"fuselage": fuselages, "wing": wings, "prop": props},
+        "vsp3_path": str(model_path), "geom_ids": {"wing": wings},
         "reference": reference,
-        "analysis": {"results_id": result_id},
-        "sweep_outputs": _read_results(vsp, result_id, alphas, notes),
-        "notes": notes,
-        "debug": {},  # Campaign YAML files still declare this output.
+        "analysis": {"results_id": result_id, "Mach": mach, "ReCref": reynolds,
+                     "V": V, "h": h, "alpha": alpha},
+        "sweep_outputs": sweep_outputs, "notes": notes,
     }
+
+
+# Convenient name for the optimization script; this is not a pytest test.
+test_vsp_run = vsp_run
+test_vsp_run.__test__ = False
